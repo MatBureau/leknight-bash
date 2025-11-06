@@ -279,7 +279,9 @@ autopilot_scan_domain() {
 
     # Step 2: Web reconnaissance on main domain
     log_info "Scanning main domain..."
-    workflow_web_quick "https://${domain}"
+    local protocol=$(smart_detect_protocol "$domain")
+    log_info "Using protocol: $protocol"
+    workflow_web_quick "${protocol}://${domain}"
 
     # Step 3: DNS enumeration
     log_info "DNS enumeration..."
@@ -308,7 +310,9 @@ EOF
 
         echo "$subdomains" | while read -r subdomain; do
             log_info "Quick scan: $subdomain"
-            workflow_web_quick "https://${subdomain}"
+            local sub_protocol=$(smart_detect_protocol "$subdomain")
+            log_info "Using protocol: $sub_protocol for $subdomain"
+            workflow_web_quick "${sub_protocol}://${subdomain}"
             sleep 2
         done
     fi

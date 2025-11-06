@@ -24,6 +24,12 @@ All notable changes to LeKnight will be documented in this file.
 - **Solution**: Used sqlite3 `-batch` mode and suppressed stderr (`2>/dev/null`)
 - **Solution**: Rewrote `get_or_create_target()` to create targets silently without log pollution
 
+#### Protocol Detection - Fixed Forced HTTPS on HTTP-only Sites
+- **Fixed bug** where autopilot forced HTTPS on all domains, causing timeouts on HTTP-only sites
+- **Root cause**: Hardcoded `https://` in `autopilot_scan_domain()` and subdomain scanning
+- **Solution**: Created smart protocol detection system that tests both HTTPS and HTTP
+- **New module**: `core/protocol_detection.sh` with port checking and HTTP probing
+
 ### ✨ Added
 
 #### Database Schema Enhancements
@@ -32,10 +38,18 @@ All notable changes to LeKnight will be documented in this file.
 - Created performance indexes for autopilot queries
 - Migration script (`migrate-db.sh`) for existing databases with automatic backup
 
+#### Protocol Detection Module
+- New `core/protocol_detection.sh` module for intelligent protocol detection
+- `smart_detect_protocol()` - Tests HTTPS first, falls back to HTTP
+- `detect_protocol()` - Uses HTTP status codes to validate protocol
+- `check_port_open()` - Fast port availability check using /dev/tcp
+- `get_target_url()` - Automatic URL construction with protocol detection
+
 #### Logging Improvements
 - Enhanced debug logging throughout autopilot workflow
 - Added detailed trace of target processing at each iteration
 - Improved visibility into autopilot decision-making process
+- Protocol detection logging showing which protocol is used for each target
 
 ### 🔧 Fixed
 
@@ -60,6 +74,19 @@ All notable changes to LeKnight will be documented in this file.
 - **core/project.sh**:
   - `project_add_target()`: Now accepts URLs and extracts hostname/port automatically
   - Uses `extract_hostname()` and `extract_port()` from utils.sh
+
+- **core/protocol_detection.sh** (NEW):
+  - `smart_detect_protocol()`: Intelligent protocol detection with port checking
+  - `detect_protocol()`: HTTP-based protocol validation
+  - `check_port_open()`: Fast TCP port availability test
+  - `get_target_url()`: Automatic URL construction with protocol
+
+- **leknight-v2.sh**:
+  - Added loading of `protocol_detection.sh` module
+
+- **workflows/autopilot.sh**:
+  - `autopilot_scan_domain()`: Now uses `smart_detect_protocol()` instead of hardcoded HTTPS
+  - Subdomain scanning: Added protocol detection for each subdomain
 
 - **migrate-db.sh**:
   - Enhanced to handle cases where migration was partially applied

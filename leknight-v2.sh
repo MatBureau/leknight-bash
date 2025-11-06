@@ -32,6 +32,7 @@ source "${LEKNIGHT_ROOT}/core/logger.sh"
 source "${LEKNIGHT_ROOT}/core/utils.sh"
 source "${LEKNIGHT_ROOT}/core/database.sh"
 source "${LEKNIGHT_ROOT}/core/project.sh"
+source "${LEKNIGHT_ROOT}/core/protocol_detection.sh"
 source "${LEKNIGHT_ROOT}/core/wrapper.sh"
 source "${LEKNIGHT_ROOT}/core/parsers.sh"
 
