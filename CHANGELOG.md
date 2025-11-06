@@ -11,13 +11,19 @@ All notable changes to LeKnight will be documented in this file.
 - **Root cause**: Flawed logic for detecting "unscanned" targets - targets disappeared from the queue as soon as their first scan started
 - **Solution**: Added dedicated autopilot status tracking system
 
+#### Target Management - Fixed URL Handling
+- **Fixed bug** where URLs in scope were rejected as "Invalid target"
+- **Fixed SQL error** "near ',': syntax error" when adding targets without port numbers
+- **Solution**: Enhanced `project_add_target()` to accept URLs and extract hostname/port automatically
+- **Solution**: Fixed `db_target_add()` to handle NULL port values correctly
+
 ### ✨ Added
 
 #### Database Schema Enhancements
 - Added `autopilot_status` column to targets table (values: pending/completed/failed)
 - Added `autopilot_completed_at` timestamp column
 - Created performance indexes for autopilot queries
-- Migration script (`migrate-db.sh`) for existing databases
+- Migration script (`migrate-db.sh`) for existing databases with automatic backup
 
 #### Logging Improvements
 - Enhanced debug logging throughout autopilot workflow
@@ -41,6 +47,18 @@ All notable changes to LeKnight will be documented in this file.
   - Added duplicate checking before inserting subdomains
   - Better input sanitization (whitespace, case normalization)
 
+- **core/database.sh**:
+  - `db_target_add()`: Now handles NULL port values correctly (no more SQL syntax errors)
+
+- **core/project.sh**:
+  - `project_add_target()`: Now accepts URLs and extracts hostname/port automatically
+  - Uses `extract_hostname()` and `extract_port()` from utils.sh
+
+- **migrate-db.sh**:
+  - Enhanced to handle cases where migration was partially applied
+  - Added error suppression for "column already exists" errors
+  - Improved robustness and logging
+
 ### 📚 Documentation
 
 - Added `AUTOPILOT_FIX_GUIDE.md` with:
@@ -50,9 +68,19 @@ All notable changes to LeKnight will be documented in this file.
   - Troubleshooting guide
   - Before/after comparison
 
+- Added `VPS_DEPLOY.md` with:
+  - Quick deployment guide for VPS/Ubuntu servers
+  - Common error resolutions
+  - Complete testing checklist
+  - Debug commands and tips
+
 ### 🔄 Migration
 
 Run `./migrate-db.sh` to update existing databases with new autopilot columns.
+
+### ⚠️ Breaking Changes
+
+None. All changes are backward compatible with v2.0.0 data.
 
 **Note**: This is a critical fix. All users running v2.0.0 should upgrade to v2.0.1 immediately.
 

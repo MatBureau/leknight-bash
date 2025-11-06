@@ -10,7 +10,10 @@ while [ -h "$SOURCE" ]; do
     SOURCE="$(readlink "$SOURCE")"
     [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
 done
-export LEKNIGHT_ROOT="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+LEKNIGHT_ROOT="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+
+# Create data/db directory if it doesn't exist
+mkdir -p "${LEKNIGHT_ROOT}/data/db"
 
 # Database location
 DB_PATH="${LEKNIGHT_ROOT}/data/db/leknight.db"
@@ -62,18 +65,18 @@ fi
 # Apply migration
 echo -e "${BLUE}[i] Applying migration...${NC}"
 
-sqlite3 "$DB_PATH" <<EOF
--- Add autopilot status tracking columns
-ALTER TABLE targets ADD COLUMN autopilot_status TEXT DEFAULT 'pending';
-ALTER TABLE targets ADD COLUMN autopilot_completed_at DATETIME;
+# Try to add columns (may fail if they already exist, that's ok)
+sqlite3 "$DB_PATH" "ALTER TABLE targets ADD COLUMN autopilot_status TEXT DEFAULT 'pending';" 2>/dev/null
+sqlite3 "$DB_PATH" "ALTER TABLE targets ADD COLUMN autopilot_completed_at DATETIME;" 2>/dev/null
 
--- Create indexes for performance
+# Create indexes (these use IF NOT EXISTS so they're safe)
+sqlite3 "$DB_PATH" <<EOF
 CREATE INDEX IF NOT EXISTS idx_targets_autopilot ON targets(autopilot_status);
 CREATE INDEX IF NOT EXISTS idx_targets_project_autopilot ON targets(project_id, autopilot_status);
-
--- Update existing targets to pending status
-UPDATE targets SET autopilot_status = 'pending' WHERE autopilot_status IS NULL;
 EOF
+
+# Update existing targets to pending status
+sqlite3 "$DB_PATH" "UPDATE targets SET autopilot_status = 'pending' WHERE autopilot_status IS NULL;"
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}[✓] Migration completed successfully${NC}"

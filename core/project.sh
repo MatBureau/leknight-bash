@@ -330,11 +330,19 @@ project_add_target() {
         return 1
     fi
 
-    # Determine if target is IP or hostname
+    # Determine if target is IP, hostname, or URL
     local hostname=""
     local ip=""
 
-    if is_valid_ip "$target"; then
+    if is_valid_url "$target"; then
+        # Extract hostname from URL
+        hostname=$(extract_hostname "$target")
+        # Extract port from URL if not provided
+        if [ -z "$port" ]; then
+            port=$(extract_port "$target")
+        fi
+        log_debug "Extracted hostname '$hostname' and port '$port' from URL"
+    elif is_valid_ip "$target"; then
         ip="$target"
     elif is_valid_domain "$target"; then
         hostname="$target"

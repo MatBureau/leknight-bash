@@ -193,9 +193,15 @@ db_target_add() {
     local service="$5"
     local tags="$6"
 
+    # Handle NULL values for port
+    local port_value="NULL"
+    if [ -n "$port" ] && [ "$port" != "0" ]; then
+        port_value="$port"
+    fi
+
     sqlite3 "$DB_PATH" <<EOF
 INSERT INTO targets (project_id, hostname, ip, port, service, tags)
-VALUES ($project_id, '$hostname', '$ip', $port, '$service', '$tags');
+VALUES ($project_id, '$hostname', '$ip', $port_value, '$service', '$tags');
 SELECT last_insert_rowid();
 EOF
 }
