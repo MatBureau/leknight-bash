@@ -88,10 +88,14 @@ autopilot_start() {
         log_section "AUTOPILOT ITERATION $iteration"
 
         # Get all unscanned targets
+        log_debug "Checking for unscanned targets in project $project_id..."
         local targets=$(get_unscanned_targets "$project_id")
+
+        log_debug "Found targets: $(echo "$targets" | wc -l) line(s)"
 
         if [ -z "$targets" ]; then
             log_info "No more targets to scan"
+            log_debug "Breaking autopilot loop - all targets processed"
             new_targets_found=false
             break
         fi
@@ -101,7 +105,7 @@ autopilot_start() {
 
         # Scan each target
         local processed=0
-        echo "$targets" | while IFS='|' read -r target_id hostname ip port; do
+        while IFS='|' read -r target_id hostname ip port; do
             ((processed++))
 
             # Determine target identifier
@@ -124,15 +128,18 @@ autopilot_start() {
 
             # Small delay to be polite
             sleep 2
-        done
+        done < <(echo "$targets")
 
         # Check if new targets were discovered
         local new_target_count=$(count_unscanned_targets "$project_id")
+        log_debug "Unscanned targets remaining: $new_target_count"
 
         if [ "$new_target_count" -eq 0 ]; then
+            log_debug "No new targets found, ending autopilot"
             new_targets_found=false
         else
             log_info "Discovered $new_target_count new targets, starting new iteration"
+            log_debug "Waiting 5 seconds before next iteration..."
             sleep 5
         fi
     done
@@ -159,21 +166,28 @@ autopilot_scan_target() {
     local target="$3"
 
     log_info "Analyzing target type: $target"
+    log_debug "Target ID: $target_id, Project ID: $project_id"
 
     # Determine target type and appropriate workflow
     if is_valid_ip "$target"; then
+        log_debug "Target identified as IP address"
         autopilot_scan_ip "$project_id" "$target_id" "$target"
 
     elif is_valid_domain "$target"; then
+        log_debug "Target identified as domain"
         autopilot_scan_domain "$project_id" "$target_id" "$target"
 
     elif is_valid_url "$target"; then
+        log_debug "Target identified as URL"
         autopilot_scan_url "$project_id" "$target_id" "$target"
 
     else
         log_warning "Unknown target type, attempting generic scan"
+        log_debug "Running fallback nmap scan on $target"
         run_tool "nmap" "$target"
     fi
+
+    log_debug "Completed scan for target: $target"
 }
 
 # Scan IP address
@@ -320,15 +334,12 @@ autopilot_scan_url() {
 get_unscanned_targets() {
     local project_id="$1"
 
-    # Get targets that haven't been scanned yet (no associated scans)
+    # Get targets that haven't been scanned yet by autopilot
     sqlite3 "$DB_PATH" <<EOF
 SELECT t.id, t.hostname, t.ip, t.port
 FROM targets t
 WHERE t.project_id = $project_id
-AND NOT EXISTS (
-    SELECT 1 FROM scans s
-    WHERE s.target_id = t.id
-)
+AND (t.autopilot_status IS NULL OR t.autopilot_status = 'pending')
 ORDER BY t.created_at ASC;
 EOF
 }
@@ -341,10 +352,7 @@ count_unscanned_targets() {
 SELECT COUNT(*)
 FROM targets t
 WHERE t.project_id = $project_id
-AND NOT EXISTS (
-    SELECT 1 FROM scans s
-    WHERE s.target_id = t.id
-);
+AND (t.autopilot_status IS NULL OR t.autopilot_status = 'pending');
 EOF
 }
 
@@ -352,8 +360,14 @@ EOF
 mark_target_scanned() {
     local target_id="$1"
 
-    # This is automatically handled by run_tool, but we can add a marker if needed
-    log_debug "Target $target_id marked as processed"
+    sqlite3 "$DB_PATH" <<EOF
+UPDATE targets
+SET autopilot_status = 'completed',
+    autopilot_completed_at = CURRENT_TIMESTAMP
+WHERE id = $target_id;
+EOF
+
+    log_debug "Target $target_id marked as scanned by autopilot"
 }
 
 # Autopilot summary report

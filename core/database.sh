@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS targets (
     service TEXT,
     tags TEXT,
     notes TEXT,
+    autopilot_status TEXT DEFAULT 'pending',
+    autopilot_completed_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
@@ -110,6 +112,8 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
 
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_targets_project ON targets(project_id);
+CREATE INDEX IF NOT EXISTS idx_targets_autopilot ON targets(autopilot_status);
+CREATE INDEX IF NOT EXISTS idx_targets_project_autopilot ON targets(project_id, autopilot_status);
 CREATE INDEX IF NOT EXISTS idx_scans_project ON scans(project_id);
 CREATE INDEX IF NOT EXISTS idx_scans_target ON scans(target_id);
 CREATE INDEX IF NOT EXISTS idx_findings_project ON findings(project_id);

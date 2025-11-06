@@ -2,6 +2,62 @@
 
 All notable changes to LeKnight will be documented in this file.
 
+## [2.0.1] - 2025-01-16
+
+### 🐛 Critical Bug Fixes
+
+#### Autopilot Mode - Fixed Immediate Termination
+- **Fixed critical bug** where autopilot would stop immediately after starting without scanning any targets
+- **Root cause**: Flawed logic for detecting "unscanned" targets - targets disappeared from the queue as soon as their first scan started
+- **Solution**: Added dedicated autopilot status tracking system
+
+### ✨ Added
+
+#### Database Schema Enhancements
+- Added `autopilot_status` column to targets table (values: pending/completed/failed)
+- Added `autopilot_completed_at` timestamp column
+- Created performance indexes for autopilot queries
+- Migration script (`migrate-db.sh`) for existing databases
+
+#### Logging Improvements
+- Enhanced debug logging throughout autopilot workflow
+- Added detailed trace of target processing at each iteration
+- Improved visibility into autopilot decision-making process
+
+### 🔧 Fixed
+
+#### Core Functionality
+- **workflows/autopilot.sh**:
+  - `get_unscanned_targets()`: Now uses `autopilot_status` instead of checking scan existence
+  - `mark_target_scanned()`: Actually updates target status (was just a debug log before)
+  - `count_unscanned_targets()`: Aligned with new status-based logic
+  - Main loop: Fixed subshell issue causing variable propagation problems (replaced pipe with process substitution)
+
+- **core/wrapper.sh**:
+  - Fixed `stat` command compatibility (Windows/Linux/macOS) - replaced with portable `wc -c`
+
+- **core/parsers.sh**:
+  - Improved subdomain parser to validate line-by-line instead of using permissive regex
+  - Added duplicate checking before inserting subdomains
+  - Better input sanitization (whitespace, case normalization)
+
+### 📚 Documentation
+
+- Added `AUTOPILOT_FIX_GUIDE.md` with:
+  - Detailed explanation of the bug
+  - Complete list of fixes applied
+  - Step-by-step testing instructions
+  - Troubleshooting guide
+  - Before/after comparison
+
+### 🔄 Migration
+
+Run `./migrate-db.sh` to update existing databases with new autopilot columns.
+
+**Note**: This is a critical fix. All users running v2.0.0 should upgrade to v2.0.1 immediately.
+
+---
+
 ## [2.0.0] - 2025-01-15
 
 ### 🚀 Major Rewrite

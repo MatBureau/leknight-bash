@@ -203,11 +203,27 @@ parse_subdomain_output() {
 
     local subdomain_count=0
 
-    # Extract subdomains (one per line, domain format)
-    grep -oE "[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*" "$output_file" | \
-    sort -u | while read -r subdomain; do
-        # Skip if not a valid domain
-        is_valid_domain "$subdomain" || continue
+    # Read line by line and validate each subdomain
+    while IFS= read -r subdomain; do
+        # Clean the line
+        subdomain=$(echo "$subdomain" | tr -d '\r\n\t ' | tr '[:upper:]' '[:lower:]')
+
+        # Skip empty lines
+        [ -z "$subdomain" ] && continue
+
+        # Validate with the is_valid_domain function
+        if ! is_valid_domain "$subdomain"; then
+            log_debug "Skipping invalid domain: $subdomain"
+            continue
+        fi
+
+        # Check if already in database
+        local existing=$(sqlite3 "$DB_PATH" "SELECT id FROM targets WHERE project_id = $project_id AND hostname = '$subdomain' LIMIT 1;")
+
+        if [ -n "$existing" ]; then
+            log_debug "Subdomain already exists: $subdomain"
+            continue
+        fi
 
         # Add as a new target
         local new_target_id=$(db_target_add "$project_id" "$subdomain" "" "" "" "subdomain")
@@ -219,7 +235,7 @@ parse_subdomain_output() {
             # Create info finding
             db_finding_add "$scan_id" "$project_id" "$new_target_id" "info" "subdomain" "Subdomain discovered: $subdomain" "Found via subdomain enumeration" "$subdomain"
         fi
-    done
+    done < "$output_file"
 
     log_success "Discovered $subdomain_count subdomains"
 }

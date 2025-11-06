@@ -55,7 +55,12 @@ run_tool() {
 
     # Log completion
     log_tool_complete "$tool_name" "$exit_code"
-    log_file_saved "$output_file" "$(format_size $(stat -f%z "$output_file" 2>/dev/null || stat -c%s "$output_file" 2>/dev/null || echo 0))"
+
+    # Get file size in a portable way
+    if [ -f "$output_file" ]; then
+        local file_size=$(wc -c < "$output_file" 2>/dev/null || echo 0)
+        log_file_saved "$output_file" "$(format_size $file_size)"
+    fi
 
     # Parse results if tool completed successfully
     if [ "$exit_code" -eq 0 ]; then
