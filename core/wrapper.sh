@@ -88,8 +88,17 @@ EOF
     if [ -n "$target_id" ]; then
         echo "$target_id"
     else
-        # Create new target
-        project_add_target "$project_id" "$target"
+        # Create new target (redirect logs to stderr to avoid polluting stdout)
+        project_add_target "$project_id" "$target" >&2
+
+        # Retrieve the newly created target ID
+        sqlite3 "$DB_PATH" <<EOF
+SELECT id FROM targets
+WHERE project_id = $project_id
+AND (hostname = '$target' OR ip = '$target')
+ORDER BY id DESC
+LIMIT 1;
+EOF
     fi
 }
 

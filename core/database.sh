@@ -230,6 +230,10 @@ db_scan_create() {
     local command="$4"
     local output_file="$5"
 
+    # Escape single quotes in command and output_file
+    command=$(echo "$command" | sed "s/'/''/g")
+    output_file=$(echo "$output_file" | sed "s/'/''/g")
+
     sqlite3 "$DB_PATH" <<EOF
 INSERT INTO scans (project_id, target_id, tool, command, output_file, status)
 VALUES ($project_id, $target_id, '$tool', '$command', '$output_file', 'running');
@@ -283,6 +287,13 @@ db_finding_add() {
     local title="$6"
     local description="$7"
     local evidence="$8"
+
+    # Escape single quotes in text fields
+    severity=$(echo "$severity" | sed "s/'/''/g")
+    type=$(echo "$type" | sed "s/'/''/g")
+    title=$(echo "$title" | sed "s/'/''/g")
+    description=$(echo "$description" | sed "s/'/''/g")
+    evidence=$(echo "$evidence" | sed "s/'/''/g")
 
     sqlite3 "$DB_PATH" <<EOF
 INSERT INTO findings (scan_id, project_id, target_id, severity, type, title, description, evidence)
