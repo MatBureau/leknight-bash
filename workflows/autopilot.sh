@@ -4,6 +4,39 @@
 # Intelligently scans targets without human intervention
 # Analyzes results and makes decisions about next steps
 
+# Parse scope and create initial targets
+parse_scope_to_targets() {
+    local project_id="$1"
+    local scope="$2"
+
+    log_info "Parsing project scope and creating targets..."
+
+    # Parse each line of scope
+    while IFS= read -r line; do
+        # Skip empty lines
+        [ -z "$line" ] && continue
+
+        # Trim whitespace
+        line=$(echo "$line" | xargs)
+
+        # Check if target already exists
+        local existing=$(sqlite3 "$DB_PATH" <<EOF
+SELECT id FROM targets
+WHERE project_id = $project_id
+AND (hostname = '$line' OR ip = '$line')
+LIMIT 1;
+EOF
+)
+
+        if [ -z "$existing" ]; then
+            log_info "Adding target from scope: $line"
+            project_add_target "$project_id" "$line"
+        else
+            log_debug "Target already exists: $line"
+        fi
+    done <<< "$scope"
+}
+
 # Main autopilot function - fully autonomous mode
 autopilot_start() {
     local project_id=$(get_current_project)
@@ -34,6 +67,14 @@ autopilot_start() {
     if ! confirm "Start autonomous scanning?" "y"; then
         log_info "Autopilot cancelled"
         return 0
+    fi
+
+    # Parse scope and create initial targets if none exist
+    local existing_targets=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM targets WHERE project_id = $project_id;")
+    if [ "$existing_targets" -eq 0 ]; then
+        log_info "No targets found in database, creating from scope..."
+        parse_scope_to_targets "$project_id" "$scope"
+        echo
     fi
 
     # Start autopilot loop
