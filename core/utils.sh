@@ -77,6 +77,38 @@ is_valid_port() {
     [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1 ] && [ "$port" -le 65535 ]
 }
 
+# Validate command for dangerous patterns
+validate_command() {
+    local cmd="$1"
+
+    # Blacklist of dangerous patterns
+    local dangerous_patterns=(
+        ';.*rm -rf'           # Command chaining with rm -rf
+        '\|\|.*rm'            # OR with rm
+        '&&.*rm -rf'          # AND with rm -rf
+        '`.*rm.*`'            # Backticks with rm
+        '\$\(.*rm -rf.*\)'    # Command substitution with rm -rf
+        '>/dev/sd'            # Write to disk device
+        'dd if='              # Disk copy
+        'mkfs'                # Format filesystem
+        ':(){:|:&};:'         # Fork bomb
+        'chmod -R 777'        # Dangerous permissions
+        '>/etc/'              # Write to system config
+        'curl.*\|.*bash'      # Pipe download to bash
+        'wget.*\|.*sh'        # Pipe download to sh
+    )
+
+    for pattern in "${dangerous_patterns[@]}"; do
+        if echo "$cmd" | grep -qE "$pattern"; then
+            log_error "Dangerous pattern detected in command: $pattern"
+            log_debug "Blocked command: $cmd"
+            return 1
+        fi
+    done
+
+    return 0
+}
+
 # Extract hostname from URL
 extract_hostname() {
     local url="$1"

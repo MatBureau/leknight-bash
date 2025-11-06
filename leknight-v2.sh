@@ -27,12 +27,16 @@ YELLOW="$(tput setaf 3)"
 # Export colors for use in other modules
 export RESET BOLD RED BLUE GRAY BRIGHT_RED BRIGHT_BLUE GREEN YELLOW
 
+# Load environment variables if present
+[ -f "${LEKNIGHT_ROOT}/.env" ] && source "${LEKNIGHT_ROOT}/.env"
+
 # Load core modules
 source "${LEKNIGHT_ROOT}/core/logger.sh"
 source "${LEKNIGHT_ROOT}/core/utils.sh"
 source "${LEKNIGHT_ROOT}/core/database.sh"
 source "${LEKNIGHT_ROOT}/core/project.sh"
 source "${LEKNIGHT_ROOT}/core/protocol_detection.sh"
+source "${LEKNIGHT_ROOT}/core/notifications.sh"
 source "${LEKNIGHT_ROOT}/core/wrapper.sh"
 source "${LEKNIGHT_ROOT}/core/parsers.sh"
 
@@ -43,6 +47,7 @@ source "${LEKNIGHT_ROOT}/workflows/autopilot.sh"
 
 # Load reporting
 source "${LEKNIGHT_ROOT}/reports/generate_md.sh"
+source "${LEKNIGHT_ROOT}/reports/export_json.sh"
 
 # ASCII Art
 display_banner() {
@@ -94,7 +99,8 @@ display_main_menu() {
     echo -e "  ${RED}[4]${RESET}  ${BRIGHT_BLUE}Autopilot Mode${RESET}"
     echo -e "  ${RED}[5]${RESET}  ${BRIGHT_BLUE}View Results${RESET}"
     echo -e "  ${RED}[6]${RESET}  ${BRIGHT_BLUE}Generate Reports${RESET}"
-    echo -e "  ${RED}[7]${RESET}  ${BRIGHT_BLUE}Settings${RESET}"
+    echo -e "  ${RED}[7]${RESET}  ${BRIGHT_BLUE}Top Findings${RESET} ${BRIGHT_RED}⚡${RESET}"
+    echo -e "  ${RED}[8]${RESET}  ${BRIGHT_BLUE}Settings${RESET}"
     echo -e "  ${RED}[0]${RESET}  ${BRIGHT_BLUE}Exit${RESET}"
     echo
 }
@@ -276,6 +282,70 @@ menu_view_results() {
     done
 }
 
+# Show top critical findings
+show_top_findings() {
+    local project_id=$(get_current_project)
+    local limit="${1:-10}"
+
+    if [ -z "$project_id" ]; then
+        log_error "No project loaded"
+        return 1
+    fi
+
+    log_section "TOP $limit CRITICAL FINDINGS"
+
+    # Get findings count
+    local total_critical=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM findings WHERE project_id = $project_id AND severity = 'critical';")
+    local total_high=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM findings WHERE project_id = $project_id AND severity = 'high';")
+
+    echo -e "${BRIGHT_BLUE}Summary:${RESET} ${BRIGHT_RED}$total_critical critical${RESET}, ${RED}$total_high high${RESET}"
+    echo
+
+    # Display top findings
+    sqlite3 "$DB_PATH" <<EOF | while IFS='|' read -r severity type title hostname created_at; do
+SELECT
+    CASE severity
+        WHEN 'critical' THEN '🚨'
+        WHEN 'high' THEN '⚠️'
+        WHEN 'medium' THEN '⚡'
+        WHEN 'low' THEN '📌'
+        ELSE 'ℹ️'
+    END,
+    severity,
+    type,
+    title,
+    COALESCE((SELECT hostname FROM targets WHERE id = findings.target_id), 'unknown'),
+    datetime(created_at)
+FROM findings
+WHERE project_id = $project_id
+AND severity IN ('critical', 'high')
+ORDER BY
+    CASE severity
+        WHEN 'critical' THEN 1
+        WHEN 'high' THEN 2
+    END,
+    created_at DESC
+LIMIT $limit;
+EOF
+        local emoji="$severity"
+        severity=$(echo "$severity" | tr -d '🚨⚠️⚡📌ℹ️')
+
+        # Color based on severity
+        local color="$RESET"
+        case "$severity" in
+            critical) color="$BRIGHT_RED" ;;
+            high) color="$RED" ;;
+            medium) color="$YELLOW" ;;
+        esac
+
+        printf "%s ${color}%-8s${RESET} %-20s %-40s %s\n" \
+            "$emoji" "${severity^^}" "[$type]" "$title" "($hostname)"
+    done
+
+    echo
+    echo -e "${BRIGHT_BLUE}View full details:${RESET} Menu > View Results > Critical/High Findings"
+}
+
 # Generate reports menu
 menu_reports() {
     while true; do
@@ -393,7 +463,8 @@ main() {
             4) menu_autopilot ;;
             5) menu_view_results ;;
             6) menu_reports ;;
-            7) menu_settings ;;
+            7) show_top_findings; press_enter ;;
+            8) menu_settings ;;
             0)
                 echo
                 log_info "Shutting down LeKnight..."

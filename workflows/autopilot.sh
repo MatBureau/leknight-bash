@@ -105,6 +105,8 @@ autopilot_start() {
 
         # Scan each target
         local processed=0
+        local iteration_start_time=$(date +%s)
+
         while IFS='|' read -r target_id hostname ip port; do
             ((processed++))
 
@@ -118,7 +120,33 @@ autopilot_start() {
                 continue
             fi
 
-            log_info "[$processed/$target_count] Processing: $target"
+            # Calculate and display progress
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - iteration_start_time))
+            local progress=$((processed * 100 / target_count))
+
+            # Calculate ETA
+            if [ "$processed" -gt 0 ] && [ "$elapsed" -gt 0 ]; then
+                local avg_time_per_target=$((elapsed / processed))
+                local remaining=$((target_count - processed))
+                local eta_seconds=$((remaining * avg_time_per_target))
+                local eta_minutes=$((eta_seconds / 60))
+                local eta_display="${eta_minutes}m $((eta_seconds % 60))s"
+            else
+                local eta_display="calculating..."
+            fi
+
+            # Progress bar visualization
+            local bar_length=30
+            local filled=$((progress * bar_length / 100))
+            local empty=$((bar_length - filled))
+            local bar=""
+            for ((i=0; i<filled; i++)); do bar="${bar}█"; done
+            for ((i=0; i<empty; i++)); do bar="${bar}░"; done
+
+            echo
+            log_info "Progress: [${bar}] ${progress}%"
+            log_info "Target [$processed/$target_count]: $target | ETA: $eta_display"
 
             # Analyze and scan target
             autopilot_scan_target "$project_id" "$target_id" "$target"

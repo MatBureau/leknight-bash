@@ -3,6 +3,41 @@
 # wrapper.sh - Tool execution wrapper for LeKnight
 # Captures output, parses results, and stores in database
 
+# Rate limiting variables
+LAST_REQUEST_TIME=0
+REQUEST_COUNT=0
+RATE_LIMIT_WINDOW_START=0
+
+# Rate limiting function
+apply_rate_limit() {
+    local max_requests_per_second="${MAX_REQUESTS_PER_SECOND:-10}"
+    local rate_limiting_enabled="${RATE_LIMITING_ENABLED:-true}"
+
+    # Skip if rate limiting is disabled
+    [ "$rate_limiting_enabled" != "true" ] && return 0
+
+    local current_time=$(date +%s)
+    local current_ms=$(($(date +%s%N) / 1000000))
+
+    # Reset counter if we're in a new window (1 second)
+    if [ $((current_time - RATE_LIMIT_WINDOW_START)) -ge 1 ]; then
+        REQUEST_COUNT=0
+        RATE_LIMIT_WINDOW_START=$current_time
+    fi
+
+    # Check if we've exceeded the limit
+    if [ $REQUEST_COUNT -ge $max_requests_per_second ]; then
+        local wait_time=$((1000 - (current_ms % 1000)))
+        log_debug "Rate limit reached, waiting ${wait_time}ms..."
+        sleep 0.$(printf "%03d" $wait_time) 2>/dev/null || sleep 1
+        REQUEST_COUNT=0
+        RATE_LIMIT_WINDOW_START=$(date +%s)
+    fi
+
+    ((REQUEST_COUNT++))
+    LAST_REQUEST_TIME=$current_ms
+}
+
 # Execute a tool and capture results
 run_tool() {
     local tool_name="$1"
@@ -43,8 +78,18 @@ run_tool() {
     # Execute tool and capture output
     local start_time=$(date +%s)
 
-    # Run command and capture both stdout and stderr
-    eval "$command" 2>&1 | tee "$output_file"
+    # Validate command for security
+    if ! validate_command "$command"; then
+        log_error "Command validation failed - potentially dangerous command detected"
+        db_scan_complete "$scan_id" 1
+        return 1
+    fi
+
+    # Apply rate limiting before execution
+    apply_rate_limit
+
+    # Run command and capture both stdout and stderr (using bash -c instead of eval)
+    bash -c "$command" 2>&1 | tee "$output_file"
     local exit_code=${PIPESTATUS[0]}
 
     local end_time=$(date +%s)
@@ -356,6 +401,43 @@ auto_scan() {
     log_success "Auto scan completed for $target"
 }
 
+# Execute tool with automatic retry and exponential backoff
+run_tool_with_retry() {
+    local tool_name="$1"
+    local target="$2"
+    shift 2
+    local additional_args="$@"
+
+    local max_attempts="${RETRY_MAX_ATTEMPTS:-3}"
+    local attempt=1
+    local backoff_base=2
+
+    while [ $attempt -le $max_attempts ]; do
+        if [ $attempt -gt 1 ]; then
+            log_info "Retry attempt $attempt/$max_attempts for $tool_name"
+        fi
+
+        # Try running the tool
+        if run_tool "$tool_name" "$target" "$additional_args"; then
+            log_success "$tool_name completed successfully"
+            return 0
+        fi
+
+        # If this wasn't the last attempt, wait before retrying
+        if [ $attempt -lt $max_attempts ]; then
+            # Exponential backoff: 2^attempt seconds
+            local wait_time=$((backoff_base ** attempt))
+            log_warning "$tool_name failed, retrying in ${wait_time}s..."
+            sleep "$wait_time"
+        fi
+
+        ((attempt++))
+    done
+
+    log_error "$tool_name failed after $max_attempts attempts"
+    return 1
+}
+
 # Resume failed scans
 resume_failed_scans() {
     local project_id=$(get_current_project)
@@ -385,7 +467,7 @@ EOF
         echo "Command: $command"
 
         if confirm "Retry this scan?" "y"; then
-            eval "$command"
+            bash -c "$command"
             local exit_code=$?
             db_scan_complete "$scan_id" "$exit_code"
 

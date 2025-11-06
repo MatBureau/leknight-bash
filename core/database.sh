@@ -295,6 +295,11 @@ db_finding_add() {
     local description="$7"
     local evidence="$8"
 
+    # Store original severity for notifications (before escaping)
+    local original_severity="$severity"
+    local original_title="$title"
+    local original_description="$description"
+
     # Escape single quotes in text fields
     severity=$(echo "$severity" | sed "s/'/''/g")
     type=$(echo "$type" | sed "s/'/''/g")
@@ -302,11 +307,23 @@ db_finding_add() {
     description=$(echo "$description" | sed "s/'/''/g")
     evidence=$(echo "$evidence" | sed "s/'/''/g")
 
-    sqlite3 -batch "$DB_PATH" <<EOF 2>/dev/null
+    local finding_id=$(sqlite3 -batch "$DB_PATH" <<EOF 2>/dev/null
 INSERT INTO findings (scan_id, project_id, target_id, severity, type, title, description, evidence)
 VALUES ($scan_id, $project_id, $target_id, '$severity', '$type', '$title', '$description', '$evidence');
 SELECT last_insert_rowid();
 EOF
+)
+
+    # Send notification for critical/high findings
+    if [[ "$original_severity" =~ ^(critical|high)$ ]]; then
+        # Get target info for notification
+        local target_info=$(sqlite3 "$DB_PATH" "SELECT COALESCE(hostname, ip, 'unknown') FROM targets WHERE id = $target_id LIMIT 1;" 2>/dev/null || echo "unknown")
+
+        # Send notification asynchronously (don't block)
+        (notify_all "$original_severity" "$original_title" "$original_description" "$target_info" &)
+    fi
+
+    echo "$finding_id"
 }
 
 db_finding_list() {
