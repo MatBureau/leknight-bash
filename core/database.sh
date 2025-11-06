@@ -195,13 +195,14 @@ db_target_add() {
 
     # Handle NULL values for port
     local port_value="NULL"
-    if [ -n "$port" ] && [ "$port" != "0" ]; then
+    if [ -n "$port" ] && [ "$port" != "0" ] && [ "$port" != "" ]; then
         port_value="$port"
     fi
 
-    sqlite3 "$DB_PATH" <<EOF
-INSERT INTO targets (project_id, hostname, ip, port, service, tags)
-VALUES ($project_id, '$hostname', '$ip', $port_value, '$service', '$tags');
+    # Use -batch mode to avoid extra output
+    sqlite3 -batch "$DB_PATH" <<EOF 2>/dev/null
+INSERT INTO targets (project_id, hostname, ip, port, service, tags, autopilot_status)
+VALUES ($project_id, '$hostname', '$ip', $port_value, '$service', '$tags', 'pending');
 SELECT last_insert_rowid();
 EOF
 }
@@ -230,11 +231,17 @@ db_scan_create() {
     local command="$4"
     local output_file="$5"
 
+    # Validate target_id is not empty
+    if [ -z "$target_id" ] || [ "$target_id" = "" ]; then
+        echo "ERROR: target_id is empty" >&2
+        return 1
+    fi
+
     # Escape single quotes in command and output_file
     command=$(echo "$command" | sed "s/'/''/g")
     output_file=$(echo "$output_file" | sed "s/'/''/g")
 
-    sqlite3 "$DB_PATH" <<EOF
+    sqlite3 -batch "$DB_PATH" <<EOF 2>/dev/null
 INSERT INTO scans (project_id, target_id, tool, command, output_file, status)
 VALUES ($project_id, $target_id, '$tool', '$command', '$output_file', 'running');
 SELECT last_insert_rowid();
@@ -295,7 +302,7 @@ db_finding_add() {
     description=$(echo "$description" | sed "s/'/''/g")
     evidence=$(echo "$evidence" | sed "s/'/''/g")
 
-    sqlite3 "$DB_PATH" <<EOF
+    sqlite3 -batch "$DB_PATH" <<EOF 2>/dev/null
 INSERT INTO findings (scan_id, project_id, target_id, severity, type, title, description, evidence)
 VALUES ($scan_id, $project_id, $target_id, '$severity', '$type', '$title', '$description', '$evidence');
 SELECT last_insert_rowid();

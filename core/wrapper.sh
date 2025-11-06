@@ -85,21 +85,33 @@ LIMIT 1;
 EOF
 )
 
-    if [ -n "$target_id" ]; then
+    if [ -n "$target_id" ] && [ "$target_id" != "" ]; then
         echo "$target_id"
-    else
-        # Create new target (redirect logs to stderr to avoid polluting stdout)
-        project_add_target "$project_id" "$target" >&2
-
-        # Retrieve the newly created target ID
-        sqlite3 "$DB_PATH" <<EOF
-SELECT id FROM targets
-WHERE project_id = $project_id
-AND (hostname = '$target' OR ip = '$target')
-ORDER BY id DESC
-LIMIT 1;
-EOF
+        return 0
     fi
+
+    # Target doesn't exist, create it silently
+    local hostname=""
+    local ip=""
+    local port=""
+
+    # Determine target type
+    if is_valid_url "$target"; then
+        hostname=$(extract_hostname "$target")
+        port=$(extract_port "$target")
+    elif is_valid_ip "$target"; then
+        ip="$target"
+    elif is_valid_domain "$target"; then
+        hostname="$target"
+    else
+        # Invalid target, return empty
+        echo ""
+        return 1
+    fi
+
+    # Insert directly into database without logging
+    local new_id=$(db_target_add "$project_id" "$hostname" "$ip" "$port" "" "")
+    echo "$new_id"
 }
 
 # Build tool-specific command

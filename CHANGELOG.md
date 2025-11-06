@@ -17,6 +17,13 @@ All notable changes to LeKnight will be documented in this file.
 - **Solution**: Enhanced `project_add_target()` to accept URLs and extract hostname/port automatically
 - **Solution**: Fixed `db_target_add()` to handle NULL port values correctly
 
+#### Database Operations - Fixed SQL Injection Vulnerabilities & Output Pollution
+- **Fixed SQL errors** caused by unescaped single quotes in tool commands and findings
+- **Fixed target_id pollution** where log messages contaminated database IDs
+- **Solution**: Added SQL escaping for all text fields using sed
+- **Solution**: Used sqlite3 `-batch` mode and suppressed stderr (`2>/dev/null`)
+- **Solution**: Rewrote `get_or_create_target()` to create targets silently without log pollution
+
 ### ✨ Added
 
 #### Database Schema Enhancements
