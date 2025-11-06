@@ -4,8 +4,14 @@
 # Author: Mathis BUREAU
 # License: MIT
 
-# Determine script location
-export LEKNIGHT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Determine script location (resolve symlinks)
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+export LEKNIGHT_ROOT="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
 # Load color definitions
 RESET="$(tput sgr0)"
