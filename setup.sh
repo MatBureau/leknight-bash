@@ -180,12 +180,8 @@ chmod +x "${SCRIPT_DIR}/reports/"*.sh 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/migrate-db.sh" 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/start.sh" 2>/dev/null || true
 
-# Initialize database
-echo "[*] Initializing database..."
-export LEKNIGHT_ROOT="$SCRIPT_DIR"
-source "${SCRIPT_DIR}/core/logger.sh"
-source "${SCRIPT_DIR}/core/database.sh"
-db_init
+# Note: Database will be initialized on first run of leknight.sh
+echo "[*] Database will be initialized on first run"
 
 echo
 
