@@ -12,13 +12,16 @@ echo "[*] Exécution du setup..."
 bash ./setup.sh
 
 echo "[*] Reset de la base de données..."
-if [ -f "./data/leknight.db" ]; then
-    rm -f ./data/leknight.db
+if [ -f "./data/db/leknight.db" ]; then
+    rm -f ./data/db/leknight.db
     echo "[+] Base de données supprimée"
 fi
+if [ -f "./data/leknight.db" ]; then
+    rm -f ./data/leknight.db
+    echo "[+] Ancienne base de données supprimée"
+fi
 
-# Recréer la DB via le script de migration
-bash ./migrate-db.sh
+echo "[+] La base de données sera créée au premier lancement"
 
 echo "[+] Initialisation terminée!"
 echo "[*] Lancement de LeKnight..."
