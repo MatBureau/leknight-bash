@@ -97,7 +97,7 @@ echo "╚═══════════════════════�
 echo
 
 echo "Would you like to install common pentesting tools?"
-echo "This includes: nmap, nikto, sqlmap, hydra, etc."
+echo "This includes: nmap, nikto, sqlmap, hydra, ffuf, amass, wpscan, and more"
 read -rp "Install? (y/n): " install_tools
 
 if [[ $install_tools =~ ^[Yy] ]]; then
@@ -110,6 +110,15 @@ if [[ $install_tools =~ ^[Yy] ]]; then
         "whatweb"
         "dnsenum"
         "masscan"
+        "ffuf"
+        "amass"
+        "wpscan"
+        "sslscan"
+        "enum4linux"
+        "snmp"
+        "dnsutils"
+        "whois"
+        "dirsearch"
     )
 
     for tool in "${PENTEST_TOOLS[@]}"; do
@@ -148,6 +157,10 @@ if command -v go &> /dev/null; then
         "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
         "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
         "github.com/projectdiscovery/httpx/cmd/httpx@latest"
+        "github.com/lc/gau/v2/cmd/gau@latest"
+        "github.com/tomnomnom/waybackurls@latest"
+        "github.com/hakluke/hakrawler@latest"
+        "github.com/sensepost/gowitness@latest"
     )
 
     for tool in "${GO_TOOLS[@]}"; do
@@ -159,6 +172,43 @@ if command -v go &> /dev/null; then
             echo "[✓] $tool_name already installed"
         fi
     done
+fi
+
+echo
+
+# Install advanced optional tools
+echo "╔════════════════════════════════════════════════════════╗"
+echo "║        Installing Advanced Tools (Optional)            ║"
+echo "╚════════════════════════════════════════════════════════╝"
+echo
+
+echo "Would you like to install advanced reconnaissance tools?"
+echo "This includes: theHarvester, sslyze, arjun"
+read -rp "Install? (y/n): " install_advanced
+
+if [[ $install_advanced =~ ^[Yy] ]]; then
+    ADVANCED_TOOLS=(
+        "theharvester"
+        "sslyze"
+    )
+
+    for tool in "${ADVANCED_TOOLS[@]}"; do
+        if ! command -v "$tool" &> /dev/null; then
+            install_package "$tool"
+        else
+            echo "[✓] $tool already installed"
+        fi
+    done
+
+    # Install arjun via pip if Python is available
+    if command -v pip3 &> /dev/null || command -v pip &> /dev/null; then
+        if ! command -v arjun &> /dev/null; then
+            echo "[*] Installing arjun via pip..."
+            pip3 install arjun 2>/dev/null || pip install arjun 2>/dev/null || echo "[!] Failed to install arjun"
+        else
+            echo "[✓] arjun already installed"
+        fi
+    fi
 fi
 
 echo
