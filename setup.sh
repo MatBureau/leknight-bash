@@ -173,10 +173,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Make scripts executable
 echo "[*] Making scripts executable..."
-chmod +x "${SCRIPT_DIR}/leknight-v2.sh"
+chmod +x "${SCRIPT_DIR}/leknight.sh" 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/core/"*.sh 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/workflows/"*.sh 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/reports/"*.sh 2>/dev/null || true
+chmod +x "${SCRIPT_DIR}/migrate-db.sh" 2>/dev/null || true
+chmod +x "${SCRIPT_DIR}/start.sh" 2>/dev/null || true
 
 # Initialize database
 echo "[*] Initializing database..."
@@ -199,10 +201,10 @@ echo
 read -rp "Create symlink to /usr/local/bin/leknight? (requires sudo) (y/n): " create_symlink
 
 if [[ $create_symlink =~ ^[Yy] ]]; then
-    sudo ln -sf "${SCRIPT_DIR}/leknight-v2.sh" /usr/local/bin/leknight
+    sudo ln -sf "${SCRIPT_DIR}/leknight.sh" /usr/local/bin/leknight
     echo "[✓] Symlink created. You can now run 'leknight' from anywhere"
 else
-    echo "[*] You can run LeKnight with: ${SCRIPT_DIR}/leknight-v2.sh"
+    echo "[*] You can run LeKnight with: ${SCRIPT_DIR}/leknight.sh"
 fi
 
 echo
@@ -224,7 +226,7 @@ cat << 'USAGE'
 Quick Start Guide:
 
 1. Start LeKnight:
-   ./leknight-v2.sh
+   ./leknight.sh
    or just: leknight (if symlink created)
 
 2. Create a project:

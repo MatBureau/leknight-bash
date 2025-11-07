@@ -8,11 +8,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "[*] Rendre tous les scripts exécutables..."
-find . -type f -name "*.sh" -exec chmod +x {} \;
-
 echo "[*] Exécution du setup..."
-./setup.sh
+bash ./setup.sh
 
 echo "[*] Reset de la base de données..."
 if [ -f "./data/leknight.db" ]; then
@@ -21,10 +18,10 @@ if [ -f "./data/leknight.db" ]; then
 fi
 
 # Recréer la DB via le script de migration
-./migrate-db.sh
+bash ./migrate-db.sh
 
 echo "[+] Initialisation terminée!"
 echo "[*] Lancement de LeKnight..."
 echo ""
 
-./leknight.sh
+bash ./leknight.sh
