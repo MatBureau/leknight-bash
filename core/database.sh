@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS projects (
     name TEXT UNIQUE NOT NULL,
     description TEXT,
     scope TEXT,
+    user_agent TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     status TEXT DEFAULT 'active'
@@ -136,10 +137,11 @@ db_project_create() {
     local name="$1"
     local description="$2"
     local scope="$3"
+    local user_agent="$4"
 
     sqlite3 "$DB_PATH" <<EOF
-INSERT INTO projects (name, description, scope)
-VALUES ('$name', '$description', '$scope');
+INSERT INTO projects (name, description, scope, user_agent)
+VALUES ('$name', '$description', '$scope', '$user_agent');
 SELECT last_insert_rowid();
 EOF
 }
@@ -484,4 +486,40 @@ SELECT json_object(
     'credentials', (SELECT json_group_array(json_object('username', username, 'service', service)) FROM credentials WHERE project_id = $project_id)
 );
 EOF
+}
+
+# Get project User-Agent
+db_get_user_agent() {
+    local project_id="$1"
+
+    local user_agent=$(sqlite3 "$DB_PATH" "SELECT user_agent FROM projects WHERE id = $project_id;" 2>/dev/null)
+
+    if [ -n "$user_agent" ]; then
+        echo "$user_agent"
+    else
+        # Default User-Agent
+        echo "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    fi
+}
+
+# Set project User-Agent
+db_set_user_agent() {
+    local project_id="$1"
+    local user_agent="$2"
+
+    sqlite3 "$DB_PATH" "UPDATE projects SET user_agent = '$user_agent', updated_at = CURRENT_TIMESTAMP WHERE id = $project_id;"
+
+    log_success "User-Agent updated for project $project_id"
+}
+
+# Smart curl wrapper that uses project User-Agent
+curl_with_project_ua() {
+    local project_id="$1"
+    shift
+    local curl_args=("$@")
+
+    local user_agent=$(db_get_user_agent "$project_id")
+
+    # Execute curl with project User-Agent
+    curl -A "$user_agent" "${curl_args[@]}"
 }

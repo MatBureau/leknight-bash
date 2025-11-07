@@ -4,6 +4,12 @@
 # Intelligently scans targets without human intervention
 # Analyzes results and makes decisions about next steps
 
+# Load advanced 5-phase pipeline if available
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/autopilot_advanced.sh" ]; then
+    source "$(dirname "${BASH_SOURCE[0]}")/autopilot_advanced.sh"
+    log_debug "Advanced autopilot module loaded"
+fi
+
 # Parse scope and create initial targets
 parse_scope_to_targets() {
     local project_id="$1"
@@ -193,6 +199,14 @@ autopilot_scan_target() {
     local target_id="$2"
     local target="$3"
 
+    # Use advanced 5-phase pipeline if enabled and available
+    if [ "${LEKNIGHT_ADVANCED_MODE:-true}" = "true" ] && type autopilot_scan_target_advanced &>/dev/null; then
+        log_debug "Using advanced 5-phase security testing pipeline"
+        autopilot_scan_target_advanced "$project_id" "$target_id" "$target"
+        return $?
+    fi
+
+    # Fallback to standard scanning
     log_info "Analyzing target type: $target"
     log_debug "Target ID: $target_id, Project ID: $project_id"
 

@@ -33,6 +33,7 @@ project_create() {
     local name="$1"
     local description="$2"
     local scope="$3"
+    local user_agent="$4"
 
     # Validate project name
     if [ -z "$name" ]; then
@@ -49,14 +50,19 @@ project_create() {
 
     # Create project in database
     log_info "Creating project: $name"
-    local project_id=$(db_project_create "$name" "$description" "$scope")
+    local project_id=$(db_project_create "$name" "$description" "$scope" "$user_agent")
 
     if [ -n "$project_id" ]; then
         log_success "Project created with ID: $project_id"
 
+        # Display User-Agent info if custom
+        if [ -n "$user_agent" ]; then
+            log_info "Custom User-Agent configured: $user_agent"
+        fi
+
         # Create project directory structure
         local project_dir="${LEKNIGHT_ROOT}/data/projects/${project_id}"
-        mkdir -p "$project_dir"/{scans,findings,credentials,reports,notes}
+        mkdir -p "$project_dir"/{scans,findings,credentials,reports,notes,evidence,exploits}
 
         # Create project metadata file
         cat > "${project_dir}/metadata.txt" <<EOF
@@ -64,6 +70,7 @@ Project ID: $project_id
 Name: $name
 Description: $description
 Scope: $scope
+User-Agent: ${user_agent:-Default}
 Created: $(date '+%Y-%m-%d %H:%M:%S')
 EOF
 
@@ -100,8 +107,16 @@ project_create_interactive() {
     done
 
     echo
+    echo -e "${BRIGHT_YELLOW}Bug Bounty User-Agent Configuration (Optional)${RESET}"
+    echo "Some bug bounty programs require a specific User-Agent header."
+    echo "Example: 'Mozilla/5.0 -BugBounty-memento-31337'"
+    echo "Leave empty for default User-Agent."
+    echo
+    read -rp "${BRIGHT_BLUE}Custom User-Agent:${RESET} " user_agent
+
+    echo
     if confirm "Create project '$name'?" "y"; then
-        project_create "$name" "$description" "$scope"
+        project_create "$name" "$description" "$scope" "$user_agent"
     else
         log_info "Project creation cancelled"
     fi
@@ -460,4 +475,40 @@ project_export() {
         log_error "Export failed"
         return 1
     fi
+}
+
+# Set User-Agent for project
+project_set_user_agent() {
+    local project_id="${1:-$(get_current_project)}"
+    local user_agent="$2"
+
+    if [ -z "$project_id" ]; then
+        log_error "No project loaded. Use 'project load <id>' first"
+        return 1
+    fi
+
+    if [ -z "$user_agent" ]; then
+        log_error "User-Agent is required"
+        echo "Usage: project set-user-agent '<user-agent-string>'"
+        echo "Example: project set-user-agent 'Mozilla/5.0 -BugBounty-memento-31337'"
+        return 1
+    fi
+
+    db_set_user_agent "$project_id" "$user_agent"
+    log_success "User-Agent updated for project $project_id"
+}
+
+# Get User-Agent for project
+project_get_user_agent() {
+    local project_id="${1:-$(get_current_project)}"
+
+    if [ -z "$project_id" ]; then
+        log_error "No project loaded"
+        return 1
+    fi
+
+    local user_agent=$(db_get_user_agent "$project_id")
+
+    echo -e "${BRIGHT_BLUE}User-Agent for project ${project_id}:${RESET}"
+    echo "$user_agent"
 }
