@@ -328,6 +328,33 @@ EOF
     echo "$finding_id"
 }
 
+# Compatibility wrapper for vulnerability modules
+# Usage: db_add_finding project_id severity type title description cve cvss_score remediation
+db_add_finding() {
+    local project_id="$1"
+    local severity="$2"
+    local type="$3"
+    local title="$4"
+    local description="$5"
+    local cve="${6:-}"
+    local cvss_score="${7:-}"
+    local remediation="${8:-}"
+
+    # Build evidence from all provided info
+    local evidence="CVE: ${cve}\nCVSS: ${cvss_score}\nRemediation: ${remediation}"
+
+    # Get the most recent scan_id for this project (or use 0 if none)
+    local scan_id=$(sqlite3 "$DB_PATH" "SELECT id FROM scans WHERE project_id = $project_id ORDER BY id DESC LIMIT 1;" 2>/dev/null || echo "0")
+    [ -z "$scan_id" ] && scan_id=0
+
+    # Get the most recent target_id for this project (or use 0 if none)
+    local target_id=$(sqlite3 "$DB_PATH" "SELECT id FROM targets WHERE project_id = $project_id ORDER BY id DESC LIMIT 1;" 2>/dev/null || echo "0")
+    [ -z "$target_id" ] && target_id=0
+
+    # Call the original function with proper parameter order
+    db_finding_add "$scan_id" "$project_id" "$target_id" "$severity" "$type" "$title" "$description" "$evidence"
+}
+
 db_finding_list() {
     local project_id="$1"
     local severity_filter="${2:-all}"

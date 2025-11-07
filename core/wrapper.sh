@@ -221,6 +221,10 @@ build_tool_command() {
         theHarvester)
             echo "theHarvester -d $target -b all $args"
             ;;
+        sslyze)
+            # New sslyze doesn't use --regular anymore, use modern options
+            echo "sslyze --certinfo --tlsv1_3 --tlsv1_2 --tlsv1_1 --sslv3 --reneg --compression --heartbleed $target $args"
+            ;;
         dnsenum)
             echo "dnsenum $target $args"
             ;;

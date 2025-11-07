@@ -50,12 +50,12 @@ autopilot_scan_domain_advanced() {
 
     # Subdomain enumeration
     log_info "[Phase 1] Subdomain enumeration"
-    run_tool "subfinder" "$project_id" "-d $domain"
-    run_tool "amass" "$project_id" "enum -passive -d $domain"
+    run_tool "subfinder" "$domain" "-d $domain"
+    run_tool "amass" "$domain" "enum -passive -d $domain"
 
     # Technology detection
     log_info "[Phase 1] Technology fingerprinting"
-    run_tool "whatweb" "$project_id" "$target_url"
+    run_tool "whatweb" "$target_url" ""
 
     # ========================================
     # PHASE 2: ENUMERATION
@@ -64,7 +64,7 @@ autopilot_scan_domain_advanced() {
 
     # Port scanning
     log_info "[Phase 2] Port scanning"
-    run_tool "nmap" "$project_id" "-sV -sC $domain"
+    run_tool "nmap" "$domain" "-sV -sC"
 
     # Directory and file fuzzing
     log_info "[Phase 2] Fuzzing for endpoints"
@@ -72,7 +72,7 @@ autopilot_scan_domain_advanced() {
 
     # SSL/TLS analysis
     log_info "[Phase 2] SSL/TLS testing"
-    run_tool "sslyze" "$project_id" "--regular $domain"
+    run_tool "sslyze" "$domain" ""
 
     # ========================================
     # PHASE 3: VULNERABILITY SCANNING
@@ -81,16 +81,16 @@ autopilot_scan_domain_advanced() {
 
     # Nuclei templates
     log_info "[Phase 3] Running Nuclei vulnerability scans"
-    run_tool "nuclei" "$project_id" "-u $target_url -severity critical,high,medium"
+    run_tool "nuclei" "$target_url" "-severity critical,high,medium"
 
     # Nikto web scanner
     log_info "[Phase 3] Nikto web vulnerability scanner"
-    run_tool "nikto" "$project_id" "-h $target_url"
+    run_tool "nikto" "$target_url" ""
 
     # WPScan if WordPress detected
     if detect_wordpress "$target_url"; then
         log_info "[Phase 3] WordPress detected - running WPScan"
-        run_tool "wpscan" "$project_id" "--url $target_url --enumerate p,t,u"
+        run_tool "wpscan" "$target_url" "--enumerate p,t,u"
     fi
 
     # ========================================
@@ -149,7 +149,7 @@ autopilot_scan_url_advanced() {
 
     # Phase 1: Light reconnaissance
     log_phase "1/5" "Reconnaissance"
-    run_tool "whatweb" "$project_id" "$url"
+    run_tool "whatweb" "$url" ""
 
     # Phase 2: Fuzzing
     log_phase "2/5" "Enumeration"
@@ -157,7 +157,7 @@ autopilot_scan_url_advanced() {
 
     # Phase 3: Vulnerability scanning
     log_phase "3/5" "Vulnerability Scanning"
-    run_tool "nuclei" "$project_id" "-u $url -severity critical,high"
+    run_tool "nuclei" "$url" "-severity critical,high"
 
     # Phase 4: Exploitation testing
     log_phase "4/5" "Exploitation Testing"
@@ -180,15 +180,15 @@ autopilot_scan_ip_advanced() {
 
     # Phase 1: Host discovery
     log_phase "1/5" "Reconnaissance"
-    run_tool "nmap" "$project_id" "-sn $ip"  # Host discovery
+    run_tool "nmap" "$ip" "-sn"
 
     # Phase 2: Port and service enumeration
     log_phase "2/5" "Enumeration"
-    run_tool "nmap" "$project_id" "-sV -sC -p- $ip"  # Full port scan with service detection
+    run_tool "nmap" "$ip" "-sV -sC -p-"
 
     # Phase 3: Vulnerability scanning
     log_phase "3/5" "Vulnerability Scanning"
-    run_tool "nmap" "$project_id" "--script vuln $ip"
+    run_tool "nmap" "$ip" "--script vuln"
 
     # Phase 4: Service-specific testing
     log_phase "4/5" "Service-Specific Testing"

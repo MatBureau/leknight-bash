@@ -93,6 +93,11 @@ log_critical() {
     _log "CRITICAL" "$BRIGHT_RED" "⚠" "$@"
 }
 
+# Alias for compatibility
+log_warn() {
+    log_warning "$@"
+}
+
 # Special logging for tool execution
 log_tool_start() {
     local tool="$1"
