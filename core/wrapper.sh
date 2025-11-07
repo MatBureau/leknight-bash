@@ -88,9 +88,15 @@ run_tool() {
     # Apply rate limiting before execution
     apply_rate_limit
 
-    # Run command and capture both stdout and stderr (using bash -c instead of eval)
-    bash -c "$command" 2>&1 | tee "$output_file"
-    local exit_code=${PIPESTATUS[0]}
+    # Run command and capture output
+    # For nikto, suppress excessive debug output by filtering stderr
+    if [ "$tool_name" = "nikto" ]; then
+        bash -c "$command" 2>/dev/null | tee "$output_file"
+        local exit_code=${PIPESTATUS[0]}
+    else
+        bash -c "$command" 2>&1 | tee "$output_file"
+        local exit_code=${PIPESTATUS[0]}
+    fi
 
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
@@ -174,7 +180,8 @@ build_tool_command() {
             fi
             ;;
         nikto)
-            echo "nikto -h $target $args"
+            # Use -Display 1 to reduce verbosity and avoid debug output
+            echo "nikto -h $target -Display 1 -nointeractive $args"
             ;;
         nuclei)
             echo "nuclei -u $target $args"

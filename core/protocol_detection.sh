@@ -8,6 +8,17 @@ detect_protocol() {
     local domain="$1"
     local timeout="${2:-5}"  # Default 5 second timeout
 
+    # If domain already contains protocol, extract and return it
+    if echo "$domain" | grep -qE "^https://"; then
+        log_debug "Domain already has HTTPS protocol specified"
+        echo "https"
+        return 0
+    elif echo "$domain" | grep -qE "^http://"; then
+        log_debug "Domain already has HTTP protocol specified"
+        echo "http"
+        return 0
+    fi
+
     log_debug "Detecting protocol for $domain..."
 
     # Try HTTPS first (more secure)
