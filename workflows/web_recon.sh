@@ -50,8 +50,15 @@ workflow_web_recon() {
     log_workflow_step "$current_step" "$total_steps" "Technology Detection (WhatWeb)"
     db_workflow_update "$workflow_id" "$((current_step * 100 / total_steps))" "Technology Detection"
 
-    if check_and_install_tool "whatweb" "sudo apt-get install -y whatweb" true; then
-        run_tool "whatweb" "$target" "-v" || log_warning "WhatWeb failed"
+    # Test WhatWeb first before using it
+    if command_exists "whatweb"; then
+        if whatweb --version &>/dev/null; then
+            run_tool "whatweb" "$target" "-v" || log_warning "WhatWeb failed"
+        else
+            log_warning "WhatWeb is installed but broken. Skipping. Fix with: sudo apt-get install --reinstall whatweb"
+        fi
+    else
+        log_warning "WhatWeb not installed. Skipping."
     fi
 
     # STEP 2: Web Server Vulnerability Scan
