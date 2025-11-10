@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS targets (
     port INTEGER,
     service TEXT,
     tags TEXT,
+    protocol TEXT DEFAULT 'http',
     notes TEXT,
     autopilot_status TEXT DEFAULT 'pending',
     autopilot_completed_at DATETIME,
@@ -194,6 +195,7 @@ db_target_add() {
     local port="$4"
     local service="$5"
     local tags="$6"
+    local protocol="${7:-http}"  # Default to http if not specified
 
     # Handle NULL values for port
     local port_value="NULL"
@@ -203,8 +205,8 @@ db_target_add() {
 
     # Use -batch mode to avoid extra output
     sqlite3 -batch "$DB_PATH" <<EOF 2>/dev/null
-INSERT INTO targets (project_id, hostname, ip, port, service, tags, autopilot_status)
-VALUES ($project_id, '$hostname', '$ip', $port_value, '$service', '$tags', 'pending');
+INSERT INTO targets (project_id, hostname, ip, port, service, tags, protocol, autopilot_status)
+VALUES ($project_id, '$hostname', '$ip', $port_value, '$service', '$tags', '$protocol', 'pending');
 SELECT last_insert_rowid();
 EOF
 }

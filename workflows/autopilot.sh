@@ -321,7 +321,12 @@ autopilot_scan_domain() {
 
     # Step 2: Web reconnaissance on main domain
     log_info "Scanning main domain..."
-    local protocol=$(smart_detect_protocol "$domain")
+    # Get protocol from database (respects user's explicit protocol choice)
+    local protocol=$(sqlite3 "$DB_PATH" "SELECT protocol FROM targets WHERE id = $target_id LIMIT 1;" 2>/dev/null)
+    if [ -z "$protocol" ]; then
+        # Fallback to auto-detection if not in database
+        protocol=$(smart_detect_protocol "$domain")
+    fi
     log_info "Using protocol: $protocol"
     workflow_web_quick "${protocol}://${domain}"
 

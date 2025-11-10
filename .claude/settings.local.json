@@ -7,7 +7,8 @@
       "Bash(tree:*)",
       "Bash(chmod:*)",
       "Bash(dir:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(sqlite3:*)"
     ],
     "deny": [],
     "ask": []

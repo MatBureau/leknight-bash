@@ -38,7 +38,20 @@ autopilot_scan_domain_advanced() {
     local target_id="$2"
     local domain="$3"
 
-    local target_url="https://$domain"
+    # Get protocol from database (respects user's explicit protocol choice)
+    log_debug "Loading protocol for target ID $target_id..."
+    local protocol=$(sqlite3 "$DB_PATH" "SELECT protocol FROM targets WHERE id = $target_id LIMIT 1;" 2>/dev/null)
+
+    # Fallback to http if protocol not found
+    if [ -z "$protocol" ]; then
+        protocol="http"
+        log_debug "Protocol not found in database, defaulting to http"
+    else
+        log_debug "Using protocol from database: $protocol"
+    fi
+
+    local target_url="${protocol}://${domain}"
+    log_info "Testing target: $target_url"
 
     # ========================================
     # PHASE 1: RECONNAISSANCE

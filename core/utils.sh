@@ -115,6 +115,18 @@ extract_hostname() {
     echo "$url" | sed -E 's|^https?://||' | sed -E 's|/.*$||' | sed -E 's|:.*$||'
 }
 
+# Extract protocol from URL
+extract_protocol() {
+    local url="$1"
+    if [[ $url =~ ^https:// ]]; then
+        echo "https"
+    elif [[ $url =~ ^http:// ]]; then
+        echo "http"
+    else
+        echo ""
+    fi
+}
+
 # Extract port from URL
 extract_port() {
     local url="$1"

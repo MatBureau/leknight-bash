@@ -348,6 +348,7 @@ project_add_target() {
     # Determine if target is IP, hostname, or URL
     local hostname=""
     local ip=""
+    local protocol="http"  # Default protocol
 
     if is_valid_url "$target"; then
         # Extract hostname from URL
@@ -356,18 +357,29 @@ project_add_target() {
         if [ -z "$port" ]; then
             port=$(extract_port "$target")
         fi
-        log_debug "Extracted hostname '$hostname' and port '$port' from URL"
+        # Extract protocol from URL
+        protocol=$(extract_protocol "$target")
+        [ -z "$protocol" ] && protocol="http"  # Fallback to http
+        log_debug "Extracted hostname '$hostname', port '$port', and protocol '$protocol' from URL"
     elif is_valid_ip "$target"; then
         ip="$target"
+        # Default to https if port 443, otherwise http
+        if [ "$port" = "443" ]; then
+            protocol="https"
+        fi
     elif is_valid_domain "$target"; then
         hostname="$target"
+        # Default to https if port 443, otherwise http
+        if [ "$port" = "443" ]; then
+            protocol="https"
+        fi
     else
         log_error "Invalid target: $target"
         return 1
     fi
 
-    # Add to database
-    local target_id=$(db_target_add "$project_id" "$hostname" "$ip" "$port" "$service" "$tags")
+    # Add to database with protocol
+    local target_id=$(db_target_add "$project_id" "$hostname" "$ip" "$port" "$service" "$tags" "$protocol")
 
     if [ -n "$target_id" ]; then
         log_success "Target added: $target (ID: $target_id)"
