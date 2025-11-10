@@ -78,11 +78,20 @@ CORE_DEPS=(
     "wget"
     "git"
     "jq"
+    "netcat"      # Critical for reverse shells
+    "python3"     # For Python reverse shells
+    "perl"        # For Perl reverse shells
 )
 
 for dep in "${CORE_DEPS[@]}"; do
     if ! command -v "$dep" &> /dev/null; then
-        install_package "$dep"
+        # Special handling for netcat (has different package names)
+        if [ "$dep" = "netcat" ]; then
+            # Try different netcat package names
+            install_package "netcat-traditional" || install_package "ncat" || install_package "netcat" || install_package "nmap-ncat"
+        else
+            install_package "$dep"
+        fi
     else
         echo "[✓] $dep already installed"
     fi
@@ -227,11 +236,49 @@ chmod +x "${SCRIPT_DIR}/leknight.sh" 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/core/"*.sh 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/workflows/"*.sh 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/reports/"*.sh 2>/dev/null || true
+chmod +x "${SCRIPT_DIR}/modules/vulnerability_tests/"*.sh 2>/dev/null || true
+chmod +x "${SCRIPT_DIR}/modules/exploitation/"*.sh 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/migrate-db.sh" 2>/dev/null || true
 chmod +x "${SCRIPT_DIR}/start.sh" 2>/dev/null || true
 
 # Note: Database will be initialized on first run of leknight.sh
 echo "[*] Database will be initialized on first run"
+
+# Display installed exploitation capabilities
+echo
+echo "╔════════════════════════════════════════════════════════╗"
+echo "║          Exploitation Modules Status                   ║"
+echo "╚════════════════════════════════════════════════════════╝"
+echo
+
+# Check reverse shell dependencies
+echo "[*] Checking reverse shell capabilities..."
+if command -v nc &> /dev/null || command -v netcat &> /dev/null || command -v ncat &> /dev/null; then
+    echo "[✓] Netcat available - Reverse shells enabled"
+else
+    echo "[!] WARNING: Netcat not found - Reverse shells will be limited"
+fi
+
+if command -v python3 &> /dev/null || command -v python &> /dev/null; then
+    echo "[✓] Python available - Python reverse shells enabled"
+else
+    echo "[!] WARNING: Python not found - Python reverse shells disabled"
+fi
+
+if command -v perl &> /dev/null; then
+    echo "[✓] Perl available - Perl reverse shells enabled"
+else
+    echo "[!] WARNING: Perl not found - Perl reverse shells disabled"
+fi
+
+if command -v bash &> /dev/null; then
+    echo "[✓] Bash available - Bash reverse shells enabled"
+fi
+
+echo
+echo "[*] Exploitation modules installed:"
+[ -f "${SCRIPT_DIR}/modules/exploitation/rce_exploit.sh" ] && echo "  [✓] RCE Exploitation Module"
+[ -f "${SCRIPT_DIR}/modules/exploitation/post_exploit.sh" ] && echo "  [✓] Post-Exploitation Module"
 
 echo
 
@@ -287,9 +334,26 @@ Quick Start Guide:
    Menu > View Results
    Menu > Generate Reports
 
+6. **NEW** - Exploit discovered vulnerabilities:
+   Menu > Autopilot Mode > Exploit Mode
+   ⚠️  REQUIRES EXPLICIT AUTHORIZATION
+   - Automated RCE exploitation with reverse shells
+   - Post-exploitation enumeration
+   - SQLMap database extraction
+   - LFI file disclosure
+
+NEW FEATURES IN v2.0:
+✓ Union-based SQL injection testing
+✓ DNS rebinding SSRF attacks
+✓ Reverse shell automation (Bash, Python, Netcat, PHP, Perl)
+✓ Post-exploitation with 6 enumeration phases
+✓ Enhanced SQLMap parsing (credentials + hashes)
+✓ Exploitation audit logging
+
 For more information, see README.md
 
 Happy Hunting! 🎯
+⚠️  Remember: Only exploit with explicit written authorization!
 USAGE
 
 echo

