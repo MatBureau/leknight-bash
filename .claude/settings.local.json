@@ -6,7 +6,8 @@
       "Bash(mkdir:*)",
       "Bash(tree:*)",
       "Bash(chmod:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(bash:*)"
     ],
     "deny": [],
     "ask": []
