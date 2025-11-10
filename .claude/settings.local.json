@@ -8,7 +8,9 @@
       "Bash(chmod:*)",
       "Bash(dir:*)",
       "Bash(bash:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(cat:*)",
+      "Bash(find modules -name \"*.sh\" -type f -exec bash -c 'dos2unix \"\"$1\"\" 2>/dev/null || sed -i \"\"s/\\r$//\"\" \"\"$1\"\"' _ {} ;)"
     ],
     "deny": [],
     "ask": []

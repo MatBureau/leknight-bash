@@ -339,6 +339,8 @@ parse_fuzzing_results() {
 
                 # Skip if already in database
                 local exists=$(db_execute "SELECT COUNT(*) FROM targets WHERE url='$url' AND project_id=$project_id" 2>/dev/null | tail -1)
+                # Default to 0 if empty
+                exists="${exists:-0}"
                 [ "$exists" -gt 0 ] && continue
 
                 # Determine tag based on status and characteristics

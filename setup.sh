@@ -166,6 +166,7 @@ if command -v go &> /dev/null; then
         "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
         "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
         "github.com/projectdiscovery/httpx/cmd/httpx@latest"
+        "github.com/hahwul/dalfox/v2@latest"  # XSS scanner
         "github.com/lc/gau/v2/cmd/gau@latest"
         "github.com/tomnomnom/waybackurls@latest"
         "github.com/hakluke/hakrawler@latest"

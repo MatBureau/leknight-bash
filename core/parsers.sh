@@ -203,6 +203,9 @@ parse_subdomain_output() {
 
     local subdomain_count=0
 
+    # Get parent domain from target_id
+    local parent_domain=$(sqlite3 "$DB_PATH" "SELECT hostname FROM targets WHERE id = $target_id LIMIT 1;" 2>/dev/null)
+
     # Read line by line and validate each subdomain
     while IFS= read -r subdomain; do
         # Clean the line
@@ -215,6 +218,15 @@ parse_subdomain_output() {
         if ! is_valid_domain "$subdomain"; then
             log_debug "Skipping invalid domain: $subdomain"
             continue
+        fi
+
+        # CRITICAL FIX: Verify subdomain is actually a subdomain of parent domain
+        if [ -n "$parent_domain" ]; then
+            # Check if subdomain ends with .parent_domain or equals parent_domain
+            if [[ "$subdomain" != *".${parent_domain}" ]] && [[ "$subdomain" != "${parent_domain}" ]]; then
+                log_debug "Skipping unrelated domain: $subdomain (not a subdomain of $parent_domain)"
+                continue
+            fi
         fi
 
         # Check if already in database

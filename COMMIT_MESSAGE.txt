@@ -1,0 +1,51 @@
+🐛 Critical bug fixes for v2.0.3
+
+Fixed 5 critical issues affecting autopilot stability and accuracy:
+
+1. ✅ Protocol Preservation
+   - HTTP targets now stay HTTP (no auto-switch to HTTPS)
+   - Added protocol column to targets table
+   - Modified autopilot to respect user's explicit protocol choice
+   - Files: core/database.sh, core/project.sh, workflows/autopilot*.sh
+
+2. ✅ Subdomain False Positives
+   - Fixed parser adding unrelated domains (projectdiscovery.io)
+   - Added parent domain validation in parse_subdomain_output()
+   - Only actual subdomains of target are now added to scope
+   - File: core/parsers.sh
+
+3. ✅ Fuzzing Pipeline Crash
+   - Fixed "[: : integer expression expected" error
+   - Added default value for empty database results
+   - File: workflows/fuzzing_pipeline.sh line 342-343
+
+4. ✅ SQLi Credential Storage
+   - Fixed "db_add_credential: command not found" error
+   - Corrected function name to db_credential_add()
+   - File: modules/vulnerability_tests/sqli_module.sh
+
+5. ✅ XSS Module Replacement
+   - Replaced 300+ lines of buggy bash XSS module
+   - New simplified module uses professional tools (dalfox/nuclei)
+   - No more bash syntax errors with special characters
+   - Files: modules/vulnerability_tests/xss_module_simple.sh,
+            workflows/vulnerability_testing.sh, setup.sh
+
+Additional improvements:
+- Added database migration script (db_migration_protocol.sh)
+- Added verification script (verify_fixes.sh)
+- Added dalfox to setup.sh GO_TOOLS
+- Updated documentation (BUGFIX_SUMMARY_v2.md, QUICK_FIX_GUIDE.md)
+
+Testing:
+✅ All 10 verification tests pass
+✅ Syntax checks clean on all modified files
+✅ Backward compatible with existing databases (migration available)
+
+Breaking changes:
+- XSS module now requires dalfox or nuclei for full functionality
+- Old xss_module.sh backed up as xss_module.sh.backup
+
+🤖 Generated with Claude Code
+
+Co-Authored-By: Claude <noreply@anthropic.com>
